@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 from app.core.config import settings
-
+from app.prompts.resume_review import RESUME_REVIEW_PROMPT
 
 client = OpenAI(
     api_key=settings.openai_api_key,
@@ -9,14 +9,13 @@ client = OpenAI(
 
 
 def analyze_resume(text: str) -> str:
-    return f"""
-РЕЗЮМЕ ПРОАНАЛИЗИРОВАНО
+    response = client.responses.create(
+        model="gpt-4.1-mini",
+        input=f"""
+{RESUME_REVIEW_PROMPT}
 
-Длина текста: {len(text)} символов
-
-Первые 300 символов:
-
-{text[:300]}
-"""
+{text}
+""",
+    )
 
     return response.output_text

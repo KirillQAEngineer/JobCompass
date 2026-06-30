@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[4]
+BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str
 
     secret_key: str
+
+    ai_provider: str = "mock"
 
     openai_api_key: str = ""
 

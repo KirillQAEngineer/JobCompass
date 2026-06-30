@@ -4,7 +4,8 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.schemas.upload import UploadResponse
 from app.services.parsers.parser import extract_text
-from app.services.ai.openai_service import analyze_resume
+from app.services.ai.factory import get_ai
+
 
 router = APIRouter(
     prefix="/upload",
@@ -34,10 +35,15 @@ async def upload_resume(file: UploadFile = File(...)):
 
     text = extract_text(filename, content)
 
-    analysis = analyze_resume(text)
+    ai = get_ai()
+
+    analysis = ai.analyze_resume(text)
+    profile = ai.build_resume_profile(text)
 
     return UploadResponse(
-        filename=filename,
-        characters=len(text),
-        analysis=analysis,
-    )
+    filename=filename,
+    characters=len(text),
+    text=text,
+    analysis=analysis,
+    profile=profile,
+    )  
