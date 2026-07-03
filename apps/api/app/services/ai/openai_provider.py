@@ -7,6 +7,7 @@ from app.schemas.resume_profile import ResumeProfile
 from app.schemas.analysis import AnalysisResponse
 from app.prompts.job_match import JOB_MATCH_PROMPT
 from app.schemas.job_match import JobMatch
+from app.schemas.job import Job
 
 from app.services.ai.base import AIProvider
 
@@ -49,10 +50,10 @@ class OpenAIProvider(AIProvider):
 
         return response.output_parsed
         
-    def analyze_job(
+    def match_job(
     self,
     resume_text: str,
-    job_description: str,
+    job: Job,
 ) -> JobMatch:
 
         response = self.client.responses.parse(

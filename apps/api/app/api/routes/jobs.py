@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.schemas.job_request import JobRequest
 from app.services.ai.factory import get_ai
 from app.services.jobs.factory import get_jobs_provider
+from app.services.application.job_match_service import JobMatchService
 
 router = APIRouter(
     prefix="/jobs",
@@ -59,7 +60,19 @@ def search_jobs(
     provider = get_jobs_provider()
 
     jobs = provider.search(
-    profile.profession
-)
+    profile.profession,
+    )
 
-    return jobs[:limit]
+    matcher = JobMatchService()
+
+    matched_jobs = []
+
+    for job in jobs[:limit]:
+        matched_jobs.append(
+        matcher.match(
+            profile.resume_text,
+            job,
+        )
+    )
+
+    return matched_jobs

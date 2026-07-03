@@ -1,5 +1,5 @@
-from app.services.jobs.remoteok import RemoteOKProvider
+from app.services.jobs.aggregator import JobsAggregator
 
 
 def get_jobs_provider():
-    return RemoteOKProvider()
+    return JobsAggregator()
