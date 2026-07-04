@@ -57,19 +57,23 @@ class OpenAIProvider(AIProvider):
 ) -> JobMatch:
 
         response = self.client.responses.parse(
-        model="gpt-4.1-mini",
-        input=f"""
-{JOB_MATCH_PROMPT}
+    model="gpt-4.1-mini",
+    input=f"""
+    {JOB_MATCH_PROMPT}
 
-Resume:
+    Resume:
 
-{resume_text}
+    {resume_text}
 
-Job description:
+    Job:
 
-{job_description}
-""",
-        text_format=JobMatch,
-    )
+    Title: {job.title}
+    Company: {job.company}
+    Location: {job.location}
+    Source: {job.source}
+    URL: {job.url}
+    """,
+    text_format=JobMatch,
+)
 
         return response.output_parsed

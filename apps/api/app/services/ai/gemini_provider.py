@@ -8,6 +8,7 @@ from google.genai import types
 
 from app.prompts.job_match import JOB_MATCH_PROMPT
 from app.schemas.job_match import JobMatch
+from app.schemas.job import Job
 
 
 class GeminiProvider(AIProvider):
@@ -40,25 +41,30 @@ class GeminiProvider(AIProvider):
             preferred_roles=["QA Engineer"],
         )
     
-    def analyze_job(
+    def match_job(
     self,
     resume_text: str,
-    job_description: str,
+    job: Job,
 ) -> JobMatch:
 
         response = self.client.models.generate_content(
         model="gemini-2.5-flash",
         contents=f"""
-{JOB_MATCH_PROMPT}
+        {JOB_MATCH_PROMPT}
 
-Resume:
+        Resume:
 
-{resume_text}
+        {resume_text}
 
-Job description:
+        Job:
 
-{job_description}
-""",
+        Title: {job.title}
+        Company: {job.company}
+        Location: {job.location}
+        Source: {job.source}
+        URL: {job.url}
+    
+        """,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=JobMatch,

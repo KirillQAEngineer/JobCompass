@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from app.schemas.analysis import AnalysisResponse
 from app.schemas.resume_profile import ResumeProfile
 from app.schemas.job_match import JobMatch
+from app.schemas.job import Job
 
 class AIProvider(ABC):
 
@@ -14,9 +15,10 @@ class AIProvider(ABC):
     def build_resume_profile(self, text: str) -> ResumeProfile:
         pass
 
-    def analyze_job(
+    @abstractmethod
+    def match_job(
     self,
     resume_text: str,
-    job_description: str,
+    job: Job,
 ) -> JobMatch:
-        raise NotImplementedError
+        pass

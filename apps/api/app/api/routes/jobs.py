@@ -6,7 +6,7 @@ from app.db.models.user import User
 from app.db.repositories.resume_profile_repository import ResumeProfileRepository
 from app.db.session import get_db
 
-from app.schemas.job_request import JobRequest
+from app.schemas.job_match_request import JobMatchRequest
 from app.services.ai.factory import get_ai
 from app.services.jobs.factory import get_jobs_provider
 from app.services.application.job_match_service import JobMatchService
@@ -16,9 +16,9 @@ router = APIRouter(
     tags=["Jobs"],
 )
 
-@router.post("/analyze")
-def analyze_job(
-    request: JobRequest,
+@router.post("/match")
+def match_job(
+    request: JobMatchRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -33,11 +33,11 @@ def analyze_job(
             detail="Resume not found",
         )
 
-    ai = get_ai()
+    matcher = JobMatchService()
 
-    return ai.analyze_job(
+    return matcher.match(
         resume.resume_text,
-        request.job_description,
+        request.job,
     )
 
 @router.get("/search")
@@ -62,17 +62,4 @@ def search_jobs(
     jobs = provider.search(
     profile.profession,
     )
-
-    matcher = JobMatchService()
-
-    matched_jobs = []
-
-    for job in jobs[:limit]:
-        matched_jobs.append(
-        matcher.match(
-            profile.resume_text,
-            job,
-        )
-    )
-
-    return matched_jobs
+    return jobs[:limit]

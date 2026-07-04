@@ -2,6 +2,7 @@ from .resume_profile_response import ResumeProfileResponse
 from .job_match import JobMatch
 from .job_request import JobRequest
 from .job import Job
+from .job_match_request import JobMatchRequest
 
 from .user import (
     UserCreate,
