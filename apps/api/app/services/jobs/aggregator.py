@@ -71,7 +71,10 @@ class JobsAggregator:
 
         deduped = self._remove_duplicates(jobs)
 
-        cleaned = self.pipeline.clean(deduped)
+        cleaned = self.pipeline.clean(
+            deduped,
+            query=query,
+        )
 
         return cleaned
 
