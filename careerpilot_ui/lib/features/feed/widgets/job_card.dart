@@ -4,14 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/job.dart';
 import '../../../providers/job_interaction_provider.dart';
 import '../../job/screens/job_details_screen.dart';
+import '../../job/widgets/job_metadata.dart';
 
 class JobCard extends ConsumerStatefulWidget {
   final Job job;
 
-  const JobCard({
-    super.key,
-    required this.job,
-  });
+  const JobCard({super.key, required this.job});
 
   @override
   ConsumerState<JobCard> createState() => _JobCardState();
@@ -55,17 +53,13 @@ class _JobCardState extends ConsumerState<JobCard> {
     });
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Job saved'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Job saved')));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save job'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not save job')));
     }
   }
 
@@ -94,48 +88,28 @@ class _JobCardState extends ConsumerState<JobCard> {
                 ),
                 IconButton(
                   tooltip: isSaved ? 'Saved' : 'Save job',
-                  onPressed: isSaved || isSaving
-                      ? null
-                      : saveJob,
+                  onPressed: isSaved || isSaving ? null : saveJob,
                   icon: isSaving
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(
-                          isSaved
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
-                        ),
+                      : Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
                 ),
               ],
             ),
 
             const SizedBox(height: 8),
 
-            Text(
-              job.company,
-              style: const TextStyle(
-                fontSize: 16,
-              ),
-            ),
+            Text(job.company, style: const TextStyle(fontSize: 16)),
 
             const SizedBox(height: 8),
 
-            Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(job.location),
-                ),
-              ],
+            JobMetadata(
+              location: job.location,
+              workFormat: job.workFormat,
+              publishedAt: job.publishedAt,
             ),
 
             const SizedBox(height: 20),
@@ -153,10 +127,7 @@ class _JobCardState extends ConsumerState<JobCard> {
 
             Text(
               '${job.score.toStringAsFixed(0)}% Match',
-              style: TextStyle(
-                color: matchColor,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: matchColor, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 18),
@@ -168,9 +139,7 @@ class _JobCardState extends ConsumerState<JobCard> {
 
               const Text(
                 'Missing skills',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
 
               const SizedBox(height: 8),
@@ -179,11 +148,7 @@ class _JobCardState extends ConsumerState<JobCard> {
                 spacing: 8,
                 runSpacing: 8,
                 children: job.missingSkills
-                    .map(
-                      (skill) => Chip(
-                        label: Text(skill),
-                      ),
-                    )
+                    .map((skill) => Chip(label: Text(skill)))
                     .toList(),
               ),
             ],
@@ -194,25 +159,17 @@ class _JobCardState extends ConsumerState<JobCard> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: isSaved || isSaving
-                        ? null
-                        : saveJob,
+                    onPressed: isSaved || isSaving ? null : saveJob,
                     icon: isSaving
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Icon(
-                            isSaved
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
+                            isSaved ? Icons.bookmark : Icons.bookmark_border,
                           ),
-                    label: Text(
-                      isSaved ? 'Saved' : 'Save',
-                    ),
+                    label: Text(isSaved ? 'Saved' : 'Save'),
                   ),
                 ),
 
@@ -226,9 +183,7 @@ class _JobCardState extends ConsumerState<JobCard> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => JobDetailsScreen(
-                            job: job,
-                          ),
+                          builder: (_) => JobDetailsScreen(job: job),
                         ),
                       );
                     },

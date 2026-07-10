@@ -41,14 +41,7 @@ class JobInteractionNotifier extends Notifier<Set<String>> {
     try {
       await ApiClient.dio.post(
         '/jobs/interact',
-        data: {
-          'job_title': job.title,
-          'job_company': job.company,
-          'job_url': job.url,
-          'job_source': job.source,
-          'job_external_id': job.externalId,
-          'action': 'like',
-        },
+        data: job.toInteractionJson(action: 'like'),
       );
 
       state = {...state, job.url};
@@ -68,14 +61,7 @@ class JobInteractionNotifier extends Notifier<Set<String>> {
     try {
       await ApiClient.dio.post(
         '/jobs/interact',
-        data: {
-          'job_title': job.title,
-          'job_company': job.company,
-          'job_url': job.url,
-          'job_source': job.source,
-          'job_external_id': job.externalId,
-          'action': 'dislike',
-        },
+        data: job.toInteractionJson(action: 'dislike'),
       );
 
       ref.invalidate(jobsProvider);

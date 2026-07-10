@@ -54,6 +54,8 @@ class TheMuseProvider(JobProvider):
                     ),
                     source="TheMuse",
                     external_id=str(item.get("id", "")),
+                    work_format=None,
+                    published_at=item.get("publication_date"),
                 )
             )
 

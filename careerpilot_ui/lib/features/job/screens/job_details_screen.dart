@@ -33,14 +33,7 @@ class _JobDetailsScreenState extends ConsumerState<JobDetailsScreen> {
     try {
       await ApiClient.dio.post(
         '/jobs/interact',
-        data: {
-          'job_title': widget.job.title,
-          'job_company': widget.job.company,
-          'job_url': widget.job.url,
-          'job_source': widget.job.source,
-          'job_external_id': widget.job.externalId,
-          'action': 'apply',
-        },
+        data: widget.job.toInteractionJson(action: 'apply'),
       );
 
       ref.invalidate(appliedJobsProvider);

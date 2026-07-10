@@ -15,6 +15,7 @@ from app.services.jobs.geekjob import GeekJobProvider
 
 from app.services.jobs.logger import JobLogger
 from app.services.jobs.quality_pipeline import JobQualityPipeline
+from app.services.jobs.metadata_normalizer import JobMetadataNormalizer
 
 
 class JobsAggregator:
@@ -37,6 +38,7 @@ class JobsAggregator:
 
         self.logger = JobLogger()
         self.pipeline = JobQualityPipeline()
+        self.metadata_normalizer = JobMetadataNormalizer()
     def search(self, query: str) -> list[Job]:
 
         jobs = []
@@ -71,8 +73,12 @@ class JobsAggregator:
 
         deduped = self._remove_duplicates(jobs)
 
-        cleaned = self.pipeline.clean(
+        normalized = self.metadata_normalizer.normalize(
             deduped,
+        )
+
+        cleaned = self.pipeline.clean(
+            normalized,
             query=query,
         )
 

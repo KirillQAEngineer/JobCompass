@@ -34,6 +34,8 @@ class ZarplataProvider(JobProvider):
                     url=item.get("url", ""),
                     source="Zarplata",
                     external_id=str(item.get("id", "")),
+                    work_format=None,
+                    published_at=item.get("published_at"),
                 )
             )
 

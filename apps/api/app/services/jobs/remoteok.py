@@ -39,6 +39,11 @@ class RemoteOKProvider(JobProvider):
                     url=item.get("url", ""),
                     source="RemoteOK",
                     external_id=str(item.get("id", "")),
+                    work_format="Remote",
+                    published_at=(
+                        item.get("date")
+                        or item.get("epoch")
+                    ),
                 )
             )
 

@@ -8,3 +8,5 @@ class Job(BaseModel):
     url: str
     source: str
     external_id: str
+    work_format: str | None = None
+    published_at: str | None = None

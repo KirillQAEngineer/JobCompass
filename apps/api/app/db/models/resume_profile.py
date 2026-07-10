@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String, Text, DateTime
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
@@ -9,25 +9,43 @@ from app.db.models.base import Base
 class ResumeProfile(Base):
     __tablename__ = "resume_profiles"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id")
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
     )
 
-    profession: Mapped[str] = mapped_column(String(255))
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        unique=True,
+        index=True,
+    )
 
-    level: Mapped[str] = mapped_column(String(100))
+    profession: Mapped[str] = mapped_column(
+        String(255),
+    )
 
-    skills: Mapped[str] = mapped_column(Text)
+    level: Mapped[str] = mapped_column(
+        String(100),
+    )
 
-    technologies: Mapped[str] = mapped_column(Text)
+    skills: Mapped[str] = mapped_column(
+        Text,
+    )
 
-    english_level: Mapped[str] = mapped_column(String(100))
+    technologies: Mapped[str] = mapped_column(
+        Text,
+    )
 
-    preferred_roles: Mapped[str] = mapped_column(Text)
+    english_level: Mapped[str] = mapped_column(
+        String(100),
+    )
 
-    resume_text: Mapped[str] = mapped_column(Text)
+    preferred_roles: Mapped[str] = mapped_column(
+        Text,
+    )
+
+    resume_text: Mapped[str] = mapped_column(
+        Text,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

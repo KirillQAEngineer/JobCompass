@@ -2,13 +2,16 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
+from google.genai import errors
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.db.models.resume_profile import ResumeProfile
 from app.db.models.user import User
 from app.db.repositories.resume_profile_repository import (
     ResumeProfileRepository,
 )
+from app.schemas.resume_profile import ResumeProfile as ResumeProfileSchema
 from app.schemas.upload import UploadResponse
 from app.services.ai.factory import get_ai
 from app.services.parsers.parser import extract_text
@@ -38,16 +41,25 @@ class ResumeService:
         file_path = await self._save_file(file)
 
         resume_text = self._extract_text(
-        file_path,
+            file_path,
         )
 
-        profile = self._build_resume_profile(
-            resume_text,
-        )
+        try:
+            profile = self._build_resume_profile(
+                resume_text,
+            )
 
-        analysis = self._analyze_resume(
-            resume_text,
-        )
+            analysis = self._analyze_resume(
+                resume_text,
+            )
+        except errors.APIError as exception:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "AI service is temporarily unavailable. "
+                    "Please try again later."
+                ),
+            ) from exception
 
         self._save_resume_profile(
             user,
@@ -66,9 +78,9 @@ class ResumeService:
     def _validate_file(
         self,
         filename: str,
-    ):
+    ) -> None:
 
-        if not filename.endswith((".pdf", ".docx")):
+        if not filename.lower().endswith((".pdf", ".docx")):
             raise HTTPException(
                 status_code=400,
                 detail="Only PDF and DOCX files are supported.",
@@ -77,9 +89,9 @@ class ResumeService:
     async def _save_file(
         self,
         file: UploadFile,
-    ) -> tuple[Path, bytes]:
+    ) -> Path:
 
-        suffix = Path(file.filename or "").suffix
+        suffix = Path(file.filename or "").suffix.lower()
 
         filename = f"{uuid4()}{suffix}"
 
@@ -92,9 +104,9 @@ class ResumeService:
         return file_path
 
     def _extract_text(
-    self,
-    file_path: Path,
-) -> str:
+        self,
+        file_path: Path,
+    ) -> str:
 
         return extract_text(file_path)
 
@@ -119,19 +131,12 @@ class ResumeService:
     def _save_resume_profile(
         self,
         user: User,
-        profile,
+        profile: ResumeProfileSchema,
         resume_text: str,
-    ):
+    ) -> ResumeProfile:
 
-        existing = self.repository.get_by_user_id(
-            user.id,
-        )
-
-        if existing:
-            self.repository.delete(existing)
-
-        return self.repository.create(
-            user.id,
-            profile,
-            resume_text,
+        return self.repository.upsert_from_resume(
+            user_id=user.id,
+            profile=profile,
+            resume_text=resume_text,
         )

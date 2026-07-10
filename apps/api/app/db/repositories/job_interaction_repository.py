@@ -67,6 +67,37 @@ class JobInteractionRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def _update_missing_metadata(
+        self,
+        interaction: JobInteraction,
+        data: dict,
+    ) -> bool:
+        updated = False
+
+        metadata_fields = {
+            "job_location": "job_location",
+            "job_work_format": "job_work_format",
+            "job_published_at": "job_published_at",
+        }
+
+        for model_field, data_field in metadata_fields.items():
+            current_value = getattr(
+                interaction,
+                model_field,
+            )
+
+            new_value = data.get(data_field)
+
+            if not current_value and new_value:
+                setattr(
+                    interaction,
+                    model_field,
+                    new_value,
+                )
+                updated = True
+
+        return updated
+
     def create(
         self,
         user_id: int,
@@ -101,6 +132,13 @@ class JobInteractionRepository:
                 job_identity is not None
                 and interaction_identity == job_identity
             ):
+                if self._update_missing_metadata(
+                    interaction,
+                    data,
+                ):
+                    self.db.commit()
+                    self.db.refresh(interaction)
+
                 return interaction
 
             if (
@@ -108,13 +146,21 @@ class JobInteractionRepository:
                 and normalize_job_url(interaction.job_url)
                 == normalized_job_url
             ):
+                updated = self._update_missing_metadata(
+                    interaction,
+                    data,
+                )
+
                 if (
                     interaction.job_source is None
                     or interaction.job_external_id is None
                 ):
-                    interaction.job_source = job_identity[0]
-                    interaction.job_external_id = job_identity[1]
+                    if job_identity is not None:
+                        interaction.job_source = job_identity[0]
+                        interaction.job_external_id = job_identity[1]
+                        updated = True
 
+                if updated:
                     self.db.commit()
                     self.db.refresh(interaction)
 
@@ -125,6 +171,9 @@ class JobInteractionRepository:
             job_title=data["job_title"],
             job_company=data["job_company"],
             job_url=job_url,
+            job_location=data.get("job_location"),
+            job_work_format=data.get("job_work_format"),
+            job_published_at=data.get("job_published_at"),
             job_source=job_identity[0],
             job_external_id=job_identity[1],
             action=action,

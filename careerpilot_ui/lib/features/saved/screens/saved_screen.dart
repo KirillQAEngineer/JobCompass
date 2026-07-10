@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/url_launcher_utils.dart';
 import '../../../models/saved_job.dart';
+import '../../job/widgets/job_metadata.dart';
 import '../../../providers/job_interaction_provider.dart';
 import '../../../providers/saved_jobs_provider.dart';
 
@@ -197,6 +198,12 @@ class _SavedJobCard extends StatelessWidget {
             Text(
               job.company.isEmpty ? 'Company not specified' : job.company,
               style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            JobMetadata(
+              location: job.location,
+              workFormat: job.workFormat,
+              publishedAt: job.publishedAt,
             ),
             if (job.createdAt != null) ...[
               const SizedBox(height: 12),

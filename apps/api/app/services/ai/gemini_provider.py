@@ -1,16 +1,44 @@
+import logging
+
 from google import genai
+from google.genai import errors, types
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.core.config import settings
-from app.services.ai.base import AIProvider
-from app.schemas.analysis import AnalysisResponse
-from app.schemas.resume_profile import ResumeProfile
-from google.genai import types
-
 from app.prompts.job_match import JOB_MATCH_PROMPT
-from app.schemas.job_match import JobMatch
-from app.schemas.job import Job
 from app.prompts.resume_profile import RESUME_PROFILE_PROMPT
 from app.prompts.resume_review import RESUME_REVIEW_PROMPT
+from app.schemas.analysis import AnalysisResponse
+from app.schemas.job import Job
+from app.schemas.job_match import JobMatch
+from app.schemas.resume_profile import ResumeProfile
+from app.services.ai.base import AIProvider
+
+
+logger = logging.getLogger(__name__)
+
+RETRYABLE_STATUS_CODES = {
+    429,
+    500,
+    502,
+    503,
+    504,
+}
+
+
+def is_retryable_gemini_error(
+    exception: BaseException,
+) -> bool:
+
+    return (
+        isinstance(exception, errors.APIError)
+        and exception.code in RETRYABLE_STATUS_CODES
+    )
 
 
 class GeminiProvider(AIProvider):
@@ -19,7 +47,25 @@ class GeminiProvider(AIProvider):
         self.client = genai.Client(
             api_key=settings.gemini_api_key,
         )
-        
+
+    @retry(
+        retry=retry_if_exception(
+            is_retryable_gemini_error,
+        ),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(
+            multiplier=1,
+            min=1,
+            max=4,
+        ),
+        reraise=True,
+        before_sleep=lambda retry_state: logger.warning(
+            "Gemini request failed temporarily. "
+            "Retrying AI request. attempt=%s error=%s",
+            retry_state.attempt_number,
+            retry_state.outcome.exception(),
+        ),
+    )
     def _generate_json(
         self,
         prompt: str,
@@ -44,10 +90,10 @@ class GeminiProvider(AIProvider):
 
         return self._generate_json(
             prompt=f"""
-    {RESUME_REVIEW_PROMPT}
+{RESUME_REVIEW_PROMPT}
 
-    {text}
-    """,
+{text}
+""",
             schema=AnalysisResponse,
         )
 
@@ -58,13 +104,13 @@ class GeminiProvider(AIProvider):
 
         return self._generate_json(
             prompt=f"""
-    {RESUME_PROFILE_PROMPT}
+{RESUME_PROFILE_PROMPT}
 
-    {text}
-    """,
+{text}
+""",
             schema=ResumeProfile,
         )
-    
+
     def match_job(
         self,
         resume_text: str,
@@ -73,19 +119,19 @@ class GeminiProvider(AIProvider):
 
         return self._generate_json(
             prompt=f"""
-    {JOB_MATCH_PROMPT}
+{JOB_MATCH_PROMPT}
 
-    Resume:
+Resume:
 
-    {resume_text}
+{resume_text}
 
-    Job:
+Job:
 
-    Title: {job.title}
-    Company: {job.company}
-    Location: {job.location}
-    Source: {job.source}
-    URL: {job.url}
-    """,
+Title: {job.title}
+Company: {job.company}
+Location: {job.location}
+Source: {job.source}
+URL: {job.url}
+""",
             schema=JobMatch,
         )

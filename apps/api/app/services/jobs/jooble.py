@@ -36,6 +36,8 @@ class JoobleProvider(JobProvider):
                     url=item.get("link", ""),
                     source="Jooble",
                     external_id=str(item.get("id", "")),
+                    work_format=None,
+                    published_at=item.get("updated"),
                 )
             )
 

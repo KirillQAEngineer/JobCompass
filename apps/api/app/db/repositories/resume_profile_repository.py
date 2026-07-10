@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models.resume_profile import ResumeProfile
 from app.schemas.resume_profile import ResumeProfile as ResumeProfileSchema
+from app.schemas.resume_profile_update import ResumeProfileUpdate
 
 
 class ResumeProfileRepository:
@@ -40,15 +41,71 @@ class ResumeProfileRepository:
 
         return (
             self.db.query(ResumeProfile)
-            .filter(ResumeProfile.user_id == user_id)
+            .filter(
+                ResumeProfile.user_id == user_id,
+            )
             .first()
         )
-    
+
+    def update(
+        self,
+        profile: ResumeProfile,
+        data: ResumeProfileUpdate,
+    ) -> ResumeProfile:
+
+        profile.profession = data.profession
+        profile.level = data.level
+        profile.skills = ",".join(data.skills)
+        profile.technologies = ",".join(data.technologies)
+        profile.english_level = data.english_level
+        profile.preferred_roles = ",".join(data.preferred_roles)
+
+        self.db.commit()
+        self.db.refresh(profile)
+
+        return profile
+
+    def upsert_from_resume(
+        self,
+        user_id: int,
+        profile: ResumeProfileSchema,
+        resume_text: str,
+    ) -> ResumeProfile:
+
+        db_profile = self.get_by_user_id(user_id)
+
+        if db_profile is None:
+            db_profile = ResumeProfile(
+                user_id=user_id,
+                profession=profile.profession,
+                level=profile.level,
+                skills=",".join(profile.skills),
+                technologies=",".join(profile.technologies),
+                english_level=profile.english_level,
+                preferred_roles=",".join(profile.preferred_roles),
+                resume_text=resume_text,
+            )
+
+            self.db.add(db_profile)
+
+        else:
+            db_profile.profession = profile.profession
+            db_profile.level = profile.level
+            db_profile.skills = ",".join(profile.skills)
+            db_profile.technologies = ",".join(profile.technologies)
+            db_profile.english_level = profile.english_level
+            db_profile.preferred_roles = ",".join(profile.preferred_roles)
+            db_profile.resume_text = resume_text
+
+        self.db.commit()
+        self.db.refresh(db_profile)
+
+        return db_profile
+
     def delete(
-    self,
-    profile: ResumeProfile,
-):
+        self,
+        profile: ResumeProfile,
+    ) -> None:
 
         self.db.delete(profile)
-
         self.db.commit()

@@ -36,6 +36,8 @@ class RemotiveProvider(JobProvider):
                     url=item["url"],
                     source="Remotive",
                     external_id=str(item.get("id", "")),
+                    work_format="Remote",
+                    published_at=item.get("publication_date"),
                 )
             )
 

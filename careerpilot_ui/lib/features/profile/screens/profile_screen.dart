@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../providers/applied_jobs_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/profile_provider.dart';
-import '../../applications/screens/application_history_screen.dart';
+import '../../../providers/resume_upload_provider.dart';
 import '../../settings/screens/settings_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -13,7 +13,8 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
-    final appliedJobsAsync = ref.watch(appliedJobsProvider);
+    final uploadState = ref.watch(resumeUploadProvider);
+    final isUploading = uploadState.isLoading;
 
     return Scaffold(
       appBar: AppBar(
@@ -22,7 +23,35 @@ class ProfileScreen extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          profileAsync.maybeWhen(
+            data: (profile) {
+              if (profile == null) {
+                return const SizedBox.shrink();
+              }
+
+              return IconButton(
+                tooltip: 'Edit Profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: isUploading
+                    ? null
+                    : () async {
+                        final updated = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditProfileScreen(profile: profile),
+                          ),
+                        );
+
+                        if (updated == true) {
+                          ref.invalidate(profileProvider);
+                        }
+                      },
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
           IconButton(
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
               Navigator.push(
@@ -51,7 +80,6 @@ class ProfileScreen extends ConsumerWidget {
                   FilledButton.icon(
                     onPressed: () {
                       ref.invalidate(profileProvider);
-                      ref.invalidate(appliedJobsProvider);
                     },
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry'),
@@ -62,20 +90,50 @@ class ProfileScreen extends ConsumerWidget {
           );
         },
         data: (profile) {
-          final applicationCount = appliedJobsAsync.maybeWhen(
-            data: (items) => items.length,
-            orElse: () => null,
-          );
+          if (profile == null) {
+            return _EmptyProfileState(
+              isUploading: isUploading,
+              onUpload: () async {
+                final uploaded = await ref
+                    .read(resumeUploadProvider.notifier)
+                    .pickAndUploadResume();
+
+                if (!context.mounted) {
+                  return;
+                }
+
+                if (uploaded) {
+                  ref.invalidate(profileProvider);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Resume uploaded and profile created'),
+                    ),
+                  );
+
+                  return;
+                }
+
+                final state = ref.read(resumeUploadProvider);
+
+                if (state.hasError) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to upload resume')),
+                  );
+                }
+              },
+              onLogout: () async {
+                await ref.read(authProvider.notifier).logout();
+              },
+            );
+          }
+
+          final hasResume = profile.resumeText.trim().isNotEmpty;
 
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(profileProvider);
-              ref.invalidate(appliedJobsProvider);
-
-              await Future.wait([
-                ref.read(profileProvider.future),
-                ref.read(appliedJobsProvider.future),
-              ]);
+              await ref.read(profileProvider.future);
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -112,26 +170,6 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.send_outlined),
-                    title: const Text('Application History'),
-                    subtitle: Text(
-                      applicationCount == null
-                          ? 'Loading applications...'
-                          : '$applicationCount applications',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ApplicationHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
                 _ProfileSection(
                   icon: Icons.badge_outlined,
                   title: 'Preferred Roles',
@@ -157,27 +195,172 @@ class ProfileScreen extends ConsumerWidget {
                   emptyValue: 'English level not specified',
                 ),
                 Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.description_outlined),
-                    title: const Text('Resume'),
-                    subtitle: Text(
-                      profile.resumeText.isEmpty
-                          ? 'Resume is empty'
-                          : 'View resume text',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: profile.resumeText.isEmpty
-                        ? null
-                        : () {
-                            _showResume(context, profile.resumeText);
-                          },
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.description_outlined),
+                        title: const Text('Resume'),
+                        subtitle: Text(
+                          hasResume ? 'Resume uploaded' : 'No resume uploaded',
+                        ),
+                        trailing: hasResume
+                            ? const Icon(Icons.chevron_right)
+                            : null,
+                        onTap: hasResume
+                            ? () {
+                                _showResume(context, profile.resumeText);
+                              }
+                            : null,
+                      ),
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: isUploading
+                                ? null
+                                : () async {
+                                    final uploaded = await ref
+                                        .read(resumeUploadProvider.notifier)
+                                        .pickAndUploadResume();
+
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+
+                                    if (uploaded) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            hasResume
+                                                ? 'Resume replaced and profile updated'
+                                                : 'Resume uploaded and profile updated',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final state = ref.read(
+                                      resumeUploadProvider,
+                                    );
+
+                                    if (state.hasError) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Failed to upload resume',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                            icon: isUploading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(
+                                    hasResume
+                                        ? Icons.sync_outlined
+                                        : Icons.upload_file_outlined,
+                                  ),
+                            label: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                isUploading
+                                    ? 'Analyzing Resume...'
+                                    : hasResume
+                                    ? 'Replace Resume'
+                                    : 'Upload Resume',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 32),
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    await ref.read(authProvider.notifier).logout();
-                  },
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogContext) {
+                              return AlertDialog(
+                                title: const Text('Delete Resume'),
+                                content: const Text(
+                                  'This will permanently delete your '
+                                  'resume and profile data. Continue?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(dialogContext, false);
+                                    },
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () {
+                                      Navigator.pop(dialogContext, true);
+                                    },
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+
+                          if (confirmed != true || !context.mounted) {
+                            return;
+                          }
+
+                          final deleted = await ref
+                              .read(profileDeleteProvider.notifier)
+                              .deleteProfile();
+
+                          if (!context.mounted) {
+                            return;
+                          }
+
+                          if (deleted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Resume deleted successfully'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to delete resume'),
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Text('Delete Resume'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          await ref.read(authProvider.notifier).logout();
+                        },
                   icon: const Icon(Icons.logout),
                   label: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
@@ -250,6 +433,88 @@ class _ProfileSection extends StatelessWidget {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(displayValue),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyProfileState extends StatelessWidget {
+  final bool isUploading;
+  final Future<void> Function() onUpload;
+  final Future<void> Function() onLogout;
+
+  const _EmptyProfileState({
+    required this.isUploading,
+    required this.onUpload,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.description_outlined, size: 72),
+              const SizedBox(height: 24),
+              const Text(
+                'Create Your Profile',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Upload your resume to automatically create '
+                'your CareerPilot profile and fill in your '
+                'skills, technologies, experience level, '
+                'and preferred roles.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          await onUpload();
+                        },
+                  icon: isUploading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.upload_file_outlined),
+                  label: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Text(
+                      isUploading ? 'Analyzing Resume...' : 'Upload Resume',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: isUploading
+                    ? null
+                    : () async {
+                        await onLogout();
+                      },
+                icon: const Icon(Icons.logout),
+                label: const Text('Logout'),
+              ),
+            ],
+          ),
         ),
       ),
     );
