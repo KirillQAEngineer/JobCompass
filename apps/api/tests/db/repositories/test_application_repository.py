@@ -112,3 +112,89 @@ def test_get_applications_by_user_id():
     assert applications[0].job_title == "Senior QA Engineer"
 
     db.close()
+
+def test_update_application_status():
+    db = build_session()
+    user = create_user(db)
+
+    repository = ApplicationRepository(db)
+
+    application = repository.create_from_interaction(
+        user.id,
+        application_data(),
+    )
+
+    updated = repository.update_status(
+        user.id,
+        application.id,
+        "interview",
+    )
+
+    assert updated is not None
+    assert updated.id == application.id
+    assert updated.status == "interview"
+
+    persisted = db.query(Application).filter(
+        Application.id == application.id,
+    ).first()
+
+    assert persisted is not None
+    assert persisted.status == "interview"
+
+    db.close()
+
+
+def test_update_application_status_returns_none_for_other_user():
+    db = build_session()
+    owner = create_user(db)
+
+    other_user = User(
+        email="other-application-user@example.com",
+        hashed_password="test-password",
+        full_name="Other Application User",
+    )
+
+    db.add(other_user)
+    db.commit()
+    db.refresh(other_user)
+
+    repository = ApplicationRepository(db)
+
+    application = repository.create_from_interaction(
+        owner.id,
+        application_data(),
+    )
+
+    updated = repository.update_status(
+        other_user.id,
+        application.id,
+        "offer",
+    )
+
+    assert updated is None
+
+    persisted = db.query(Application).filter(
+        Application.id == application.id,
+    ).first()
+
+    assert persisted is not None
+    assert persisted.status == "applied"
+
+    db.close()
+
+
+def test_update_application_status_returns_none_for_missing_application():
+    db = build_session()
+    user = create_user(db)
+
+    repository = ApplicationRepository(db)
+
+    updated = repository.update_status(
+        user.id,
+        999999,
+        "rejected",
+    )
+
+    assert updated is None
+
+    db.close()

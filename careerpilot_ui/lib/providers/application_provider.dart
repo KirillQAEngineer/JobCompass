@@ -1,27 +1,21 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/network/api_client.dart';
-import '../models/application.dart';
-import '../models/job.dart';
+import 'package:careerpilot_ui/core/network/api_client.dart';
+import 'package:careerpilot_ui/features/applications/services/application_api.dart';
+import 'package:careerpilot_ui/models/application.dart';
+import 'package:careerpilot_ui/models/job.dart';
+
+final applicationApiProvider = Provider<ApplicationApi>(
+  (ref) => ApplicationApi(ApiClient.dio),
+);
 
 class ApplicationNotifier extends AsyncNotifier<List<Application>> {
+  ApplicationApi get _api => ref.read(applicationApiProvider);
+
   @override
   Future<List<Application>> build() async {
-    return _fetchApplications();
-  }
-
-  Future<List<Application>> _fetchApplications() async {
-    final response = await ApiClient.dio.get('/applications');
-
-    final data = response.data as List<dynamic>;
-
-    return data
-        .map(
-          (item) =>
-              Application.fromJson(Map<String, dynamic>.from(item as Map)),
-        )
-        .toList();
+    return _api.fetchApplications();
   }
 
   bool isApplied(Job job) {
@@ -41,23 +35,7 @@ class ApplicationNotifier extends AsyncNotifier<List<Application>> {
     }
 
     try {
-      final response = await ApiClient.dio.post(
-        '/applications',
-        data: {
-          'job_title': job.title,
-          'job_company': job.company,
-          'job_url': job.url,
-          'job_location': job.location.isEmpty ? null : job.location,
-          'job_work_format': job.workFormat,
-          'job_published_at': job.publishedAt?.toUtc().toIso8601String(),
-          'job_source': job.source,
-          'job_external_id': job.externalId,
-        },
-      );
-
-      final application = Application.fromJson(
-        Map<String, dynamic>.from(response.data as Map),
-      );
+      final application = await _api.createApplication(job);
 
       final currentApplications = state.value ?? const <Application>[];
 
@@ -77,10 +55,48 @@ class ApplicationNotifier extends AsyncNotifier<List<Application>> {
     }
   }
 
+  Future<bool> updateStatus({
+    required int applicationId,
+    required String status,
+  }) async {
+    try {
+      final updatedApplication = await _api.updateStatus(
+        applicationId: applicationId,
+        status: status,
+      );
+
+      final currentApplications = state.value;
+
+      if (currentApplications == null) {
+        return false;
+      }
+
+      final updatedApplications = currentApplications.map((application) {
+        if (application.id == updatedApplication.id) {
+          return updatedApplication;
+        }
+
+        return application;
+      }).toList();
+
+      updatedApplications.sort(
+        (left, right) => right.updatedAt.compareTo(left.updatedAt),
+      );
+
+      state = AsyncData(updatedApplications);
+
+      return true;
+    } on DioException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> refresh() async {
     state = const AsyncLoading();
 
-    state = await AsyncValue.guard(_fetchApplications);
+    state = await AsyncValue.guard(_api.fetchApplications);
   }
 }
 

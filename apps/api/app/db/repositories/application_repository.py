@@ -67,3 +67,28 @@ class ApplicationRepository:
             .order_by(Application.updated_at.desc())
             .all()
         )
+
+    def update_status(
+        self,
+        user_id: int,
+        application_id: int,
+        status: str,
+    ) -> Application | None:
+        application = (
+            self.db.query(Application)
+            .filter(
+                Application.id == application_id,
+                Application.user_id == user_id,
+            )
+            .first()
+        )
+
+        if application is None:
+            return None
+
+        application.status = status
+
+        self.db.commit()
+        self.db.refresh(application)
+
+        return application

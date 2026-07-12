@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -14,6 +15,20 @@ class ApplicationCreate(BaseModel):
 
     job_source: str
     job_external_id: str
+
+
+ApplicationStatus = Literal[
+    "applied",
+    "screening",
+    "interview",
+    "technical_interview",
+    "offer",
+    "rejected",
+]
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: ApplicationStatus
 
 
 class ApplicationResponse(BaseModel):

@@ -4,14 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/url_launcher_utils.dart';
 import '../../../models/application.dart';
 import '../../../providers/application_provider.dart';
+import '../models/application_status.dart';
 
-class ApplicationHistoryScreen extends ConsumerWidget {
+class ApplicationHistoryScreen extends ConsumerStatefulWidget {
   const ApplicationHistoryScreen({super.key});
 
-  Future<void> _openJob(BuildContext context, Application application) async {
+  @override
+  ConsumerState<ApplicationHistoryScreen> createState() =>
+      _ApplicationHistoryScreenState();
+}
+
+class _ApplicationHistoryScreenState
+    extends ConsumerState<ApplicationHistoryScreen> {
+  final Set<int> _updatingApplicationIds = <int>{};
+
+  Future<void> _openJob(Application application) async {
     final opened = await openExternalUrl(application.jobUrl);
 
-    if (!context.mounted) {
+    if (!mounted) {
       return;
     }
 
@@ -22,12 +32,44 @@ class ApplicationHistoryScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _refreshApplications(WidgetRef ref) async {
+  Future<void> _refreshApplications() async {
     await ref.read(applicationProvider.notifier).refresh();
   }
 
+  Future<void> _updateApplicationStatus(
+    Application application,
+    String status,
+  ) async {
+    if (_updatingApplicationIds.contains(application.id) ||
+        application.status == status) {
+      return;
+    }
+
+    setState(() {
+      _updatingApplicationIds.add(application.id);
+    });
+
+    final success = await ref
+        .read(applicationProvider.notifier)
+        .updateStatus(applicationId: application.id, status: status);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _updatingApplicationIds.remove(application.id);
+    });
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update application status')),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final applicationsAsync = ref.watch(applicationProvider);
 
     return Scaffold(
@@ -50,9 +92,7 @@ class ApplicationHistoryScreen extends ConsumerWidget {
                   Text(error.toString(), textAlign: TextAlign.center),
                   const SizedBox(height: 20),
                   FilledButton.icon(
-                    onPressed: () {
-                      ref.read(applicationProvider.notifier).refresh();
-                    },
+                    onPressed: _refreshApplications,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry'),
                   ),
@@ -64,7 +104,7 @@ class ApplicationHistoryScreen extends ConsumerWidget {
         data: (applications) {
           if (applications.isEmpty) {
             return RefreshIndicator(
-              onRefresh: () => _refreshApplications(ref),
+              onRefresh: _refreshApplications,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
@@ -96,7 +136,7 @@ class ApplicationHistoryScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () => _refreshApplications(ref),
+            onRefresh: _refreshApplications,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
@@ -106,8 +146,12 @@ class ApplicationHistoryScreen extends ConsumerWidget {
 
                 return _ApplicationCard(
                   application: application,
+                  isUpdating: _updatingApplicationIds.contains(application.id),
+                  onStatusSelected: (status) {
+                    _updateApplicationStatus(application, status);
+                  },
                   onOpen: () {
-                    _openJob(context, application);
+                    _openJob(application);
                   },
                 );
               },
@@ -121,9 +165,16 @@ class ApplicationHistoryScreen extends ConsumerWidget {
 
 class _ApplicationCard extends StatelessWidget {
   final Application application;
+  final bool isUpdating;
+  final ValueChanged<String> onStatusSelected;
   final VoidCallback onOpen;
 
-  const _ApplicationCard({required this.application, required this.onOpen});
+  const _ApplicationCard({
+    required this.application,
+    required this.isUpdating,
+    required this.onStatusSelected,
+    required this.onOpen,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +230,36 @@ class _ApplicationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Chip(label: Text(_statusLabel(application.status))),
+            Row(
+              children: [
+                if (isUpdating)
+                  const SizedBox(
+                    key: ValueKey('application-status-progress'),
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  PopupMenuButton<String>(
+                    key: ValueKey('application-status-menu-${application.id}'),
+                    tooltip: 'Change application status',
+                    onSelected: onStatusSelected,
+                    itemBuilder: (context) {
+                      return applicationStatuses.map((status) {
+                        return CheckedPopupMenuItem<String>(
+                          value: status,
+                          checked: application.status == status,
+                          child: Text(applicationStatusLabel(status)),
+                        );
+                      }).toList();
+                    },
+                    child: Chip(
+                      label: Text(applicationStatusLabel(application.status)),
+                      avatar: const Icon(Icons.arrow_drop_down, size: 18),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -193,18 +273,6 @@ class _ApplicationCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _statusLabel(String status) {
-    final normalizedStatus = status.trim().toLowerCase();
-
-    return switch (normalizedStatus) {
-      'applied' => 'Applied',
-      'interview' => 'Interview',
-      'offer' => 'Offer',
-      'rejected' => 'Rejected',
-      _ => status.isEmpty ? 'Applied' : status,
-    };
   }
 
   String _formatDate(DateTime date) {
