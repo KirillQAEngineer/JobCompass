@@ -1,5 +1,5 @@
+import 'package:careerpilot_ui/features/feed/models/filterable_job.dart';
 import 'package:careerpilot_ui/features/feed/models/job_filters.dart';
-import 'package:careerpilot_ui/models/job.dart';
 
 class JobFilterService {
   const JobFilterService();
@@ -10,8 +10,8 @@ class JobFilterService {
     'Office',
   ];
 
-  List<Job> apply({
-    required List<Job> jobs,
+  List<T> apply<T extends FilterableJob>({
+    required List<T> jobs,
     required JobFilters filters,
     Set<String> hiddenJobKeys = const <String>{},
     DateTime? now,
@@ -60,7 +60,7 @@ class JobFilterService {
     }).toList();
   }
 
-  List<String> workFormats(List<Job> jobs) {
+  List<String> workFormats<T extends FilterableJob>(List<T> jobs) {
     return supportedWorkFormats;
   }
 

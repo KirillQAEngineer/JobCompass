@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/url_launcher_utils.dart';
 import '../../../models/saved_job.dart';
-import '../../job/widgets/job_metadata.dart';
 import '../../../providers/job_interaction_provider.dart';
 import '../../../providers/saved_jobs_provider.dart';
+import '../../feed/models/job_filters.dart';
+import '../../feed/services/job_filter_service.dart';
+import '../../feed/widgets/job_filter_popups.dart';
+import '../../job/widgets/job_metadata.dart';
 
 class SavedScreen extends ConsumerStatefulWidget {
   const SavedScreen({super.key});
@@ -15,15 +18,94 @@ class SavedScreen extends ConsumerStatefulWidget {
 }
 
 class _SavedScreenState extends ConsumerState<SavedScreen> {
-  final Set<String> _removingUrls = <String>{};
+  final TextEditingController _searchController = TextEditingController();
 
-  Future<void> _removeJob(SavedJob job) async {
-    if (_removingUrls.contains(job.url)) {
+  final JobFilterService _filterService = const JobFilterService();
+
+  final Set<String> _removingJobKeys = <String>{};
+
+  JobFilters _filters = const JobFilters();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<SavedJob> _filterJobs(List<SavedJob> jobs) {
+    return _filterService.apply(jobs: jobs, filters: _filters);
+  }
+
+  void _updateQuery(String value) {
+    setState(() {
+      _filters = _filters.copyWith(query: value.trim());
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+
+    setState(() {
+      _filters = _filters.copyWith(query: '');
+    });
+  }
+
+  void _clearStructuredFilters() {
+    setState(() {
+      _filters = _filters.clearStructuredFilters();
+    });
+  }
+
+  Future<void> _openWorkFormatFilter(BuildContext buttonContext) async {
+    final renderBox = buttonContext.findRenderObject() as RenderBox;
+
+    final position = renderBox.localToGlobal(Offset(0, renderBox.size.height));
+
+    final result = await showWorkFormatFilterPopup(
+      context: context,
+      position: position,
+      currentValues: _filters.workFormats,
+      values: JobFilterService.supportedWorkFormats,
+    );
+
+    if (result == null || !mounted) {
       return;
     }
 
     setState(() {
-      _removingUrls.add(job.url);
+      _filters = _filters.copyWith(workFormats: result);
+    });
+  }
+
+  Future<void> _openPublicationDateFilter(BuildContext buttonContext) async {
+    final renderBox = buttonContext.findRenderObject() as RenderBox;
+
+    final position = renderBox.localToGlobal(Offset(0, renderBox.size.height));
+
+    final result = await showPublicationDateFilterPopup(
+      context: context,
+      position: position,
+      currentValue: _filters.publicationDate,
+    );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _filters = _filters.copyWith(publicationDate: result);
+    });
+  }
+
+  Future<void> _removeJob(SavedJob job) async {
+    final jobKey = job.stableKey;
+
+    if (_removingJobKeys.contains(jobKey)) {
+      return;
+    }
+
+    setState(() {
+      _removingJobKeys.add(jobKey);
     });
 
     final success = await ref
@@ -35,7 +117,7 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
     }
 
     setState(() {
-      _removingUrls.remove(job.url);
+      _removingJobKeys.remove(jobKey);
     });
 
     if (!success) {
@@ -65,6 +147,11 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
     }
   }
 
+  Future<void> _refreshSavedJobs() async {
+    ref.invalidate(savedJobsProvider);
+    await ref.read(savedJobsProvider.future);
+  }
+
   @override
   Widget build(BuildContext context) {
     final savedJobs = ref.watch(savedJobsProvider);
@@ -81,88 +168,188 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
           return const Center(child: CircularProgressIndicator());
         },
         error: (error, stackTrace) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, size: 48),
-                  const SizedBox(height: 16),
-                  Text(error.toString(), textAlign: TextAlign.center),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: () {
-                      ref.invalidate(savedJobsProvider);
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
+          return _SavedErrorState(
+            error: error,
+            onRetry: () {
+              ref.invalidate(savedJobsProvider);
+            },
           );
         },
         data: (items) {
           if (items.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(savedJobsProvider);
-                await ref.read(savedJobsProvider.future);
-              },
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
-                  SizedBox(height: 180),
-                  Icon(Icons.bookmark_border, size: 64),
-                  SizedBox(height: 16),
-                  Center(
-                    child: Text(
-                      'No saved jobs yet',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(
-                        'Jobs saved from the Feed will appear here.',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return _SavedEmptyState(onRefresh: _refreshSavedJobs);
           }
 
+          final filteredJobs = _filterJobs(items);
+
           return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(savedJobsProvider);
-              await ref.read(savedJobsProvider.future);
-            },
-            child: ListView.builder(
+            onRefresh: _refreshSavedJobs,
+            child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final job = items[index];
-                final isRemoving = _removingUrls.contains(job.url);
+              children: [
+                TextField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  onChanged: _updateQuery,
+                  decoration: InputDecoration(
+                    hintText: 'Search',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _filters.query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: _clearSearch,
+                            icon: const Icon(Icons.close),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Builder(
+                        builder: (buttonContext) {
+                          return FilterChip(
+                            label: Text(
+                              _filters.workFormats.isEmpty
+                                  ? 'Work format'
+                                  : 'Work format (${_filters.workFormats.length})',
+                            ),
+                            selected: _filters.workFormats.isNotEmpty,
+                            onSelected: (_) {
+                              _openWorkFormatFilter(buttonContext);
+                            },
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      Builder(
+                        builder: (buttonContext) {
+                          return FilterChip(
+                            label: Text(
+                              publicationDateLabel(_filters.publicationDate),
+                            ),
+                            selected:
+                                _filters.publicationDate !=
+                                PublicationDateFilter.anyTime,
+                            onSelected: (_) {
+                              _openPublicationDateFilter(buttonContext);
+                            },
+                          );
+                        },
+                      ),
+                      if (_filters.hasStructuredFilters) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: _clearStructuredFilters,
+                          icon: const Icon(Icons.restart_alt),
+                          label: const Text('Reset'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (filteredJobs.isEmpty)
+                  const _NoSavedJobsFoundState()
+                else
+                  ...filteredJobs.map((job) {
+                    final isRemoving = _removingJobKeys.contains(job.stableKey);
 
-                return _SavedJobCard(
-                  job: job,
-                  isRemoving: isRemoving,
-                  onRemove: () => _removeJob(job),
-                  onOpen: () => _openJob(job),
-                );
-              },
+                    return _SavedJobCard(
+                      job: job,
+                      isRemoving: isRemoving,
+                      onRemove: () => _removeJob(job),
+                      onOpen: () => _openJob(job),
+                    );
+                  }),
+              ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _SavedErrorState extends StatelessWidget {
+  final Object error;
+  final VoidCallback onRetry;
+
+  const _SavedErrorState({required this.error, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 16),
+            Text(error.toString(), textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedEmptyState extends StatelessWidget {
+  final Future<void> Function() onRefresh;
+
+  const _SavedEmptyState({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 180),
+          Icon(Icons.bookmark_border, size: 64),
+          SizedBox(height: 16),
+          Center(
+            child: Text(
+              'No saved jobs yet',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ),
+          SizedBox(height: 8),
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Jobs saved from the Feed will appear here.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoSavedJobsFoundState extends StatelessWidget {
+  const _NoSavedJobsFoundState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 100),
+      child: Center(
+        child: Text('No saved jobs found', style: TextStyle(fontSize: 18)),
       ),
     );
   }

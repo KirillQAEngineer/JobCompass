@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:careerpilot_ui/features/feed/models/job_filters.dart';
 import 'package:careerpilot_ui/features/feed/services/job_filter_service.dart';
 import 'package:careerpilot_ui/models/job.dart';
+import 'package:careerpilot_ui/models/saved_job.dart';
 
 void main() {
   const service = JobFilterService();
@@ -142,6 +143,47 @@ void main() {
 
   test('exposes exactly supported work formats', () {
     expect(service.workFormats(jobs), ['Remote', 'Hybrid', 'Office']);
+  });
+
+  test('filters saved jobs with the shared filter service', () {
+    final savedJobs = [
+      SavedJob(
+        id: 10,
+        userId: 1,
+        title: 'Senior QA Engineer',
+        company: 'Acme',
+        url: 'https://example.com/saved/10',
+        location: 'Berlin',
+        workFormat: 'Remote',
+        publishedAt: now.subtract(const Duration(hours: 6)),
+        action: 'like',
+        createdAt: now,
+      ),
+      SavedJob(
+        id: 11,
+        userId: 1,
+        title: 'Backend Engineer',
+        company: 'Beta',
+        url: 'https://example.com/saved/11',
+        location: 'London',
+        workFormat: 'Hybrid',
+        publishedAt: now.subtract(const Duration(days: 10)),
+        action: 'like',
+        createdAt: now,
+      ),
+    ];
+
+    final result = service.apply(
+      jobs: savedJobs,
+      filters: const JobFilters(
+        query: 'qa',
+        workFormats: {'Remote'},
+        publicationDate: PublicationDateFilter.last24Hours,
+      ),
+      now: now,
+    );
+
+    expect(result.map((job) => job.id), [10]);
   });
 
   test('clearStructuredFilters keeps search query', () {

@@ -1,11 +1,18 @@
-class Job {
+import 'package:careerpilot_ui/features/feed/models/filterable_job.dart';
+
+class Job implements FilterableJob {
   final String externalId;
+  @override
   final String title;
+  @override
   final String company;
+  @override
   final String location;
   final String source;
   final String url;
+  @override
   final String? workFormat;
+  @override
   final DateTime? publishedAt;
 
   final double score;
@@ -29,6 +36,7 @@ class Job {
     required this.recommendation,
   });
 
+  @override
   String get stableKey {
     if (source.isNotEmpty && externalId.isNotEmpty) {
       return '$source::$externalId';
