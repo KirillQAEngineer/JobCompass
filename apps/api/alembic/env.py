@@ -49,10 +49,6 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    print("=" * 50)
-    print(database_url)
-    print("=" * 50)
-
     connectable = create_engine(
         database_url,
         poolclass=pool.NullPool,
