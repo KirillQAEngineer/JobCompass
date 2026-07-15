@@ -28,12 +28,16 @@ class _JobDetailsScreenState extends ConsumerState<JobDetailsScreen> {
   _JobDecision? _localDecision;
 
   bool _isLoadingCoverLetter = false;
+  bool _isLoadingTailoredResume = false;
 
   String? _coverLetterError;
+  String? _tailoredResumeError;
 
   bool _coverLetterRequested = false;
+  bool _tailoredResumeRequested = false;
 
   String? _generatedCoverLetter;
+  String? _generatedTailoredResume;
 
   Future<void> _loadCoverLetter() async {
     setState(() {
@@ -62,6 +66,37 @@ class _JobDetailsScreenState extends ConsumerState<JobDetailsScreen> {
       setState(() {
         _isLoadingCoverLetter = false;
         _coverLetterError = context.tr('failed_generate_cover_letter');
+      });
+    }
+  }
+
+  Future<void> _loadTailoredResume() async {
+    setState(() {
+      _tailoredResumeRequested = true;
+      _isLoadingTailoredResume = true;
+      _tailoredResumeError = null;
+    });
+
+    try {
+      final api = ref.read(jobDetailsApiProvider);
+      final resume = await api.fetchTailoredResume(widget.job);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _generatedTailoredResume = resume;
+        _isLoadingTailoredResume = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingTailoredResume = false;
+        _tailoredResumeError = context.tr('failed_generate_resume');
       });
     }
   }
@@ -366,6 +401,11 @@ class _JobDetailsScreenState extends ConsumerState<JobDetailsScreen> {
             title: context.tr('short_cover_letter'),
             child: _buildCoverLetterContent(context),
           ),
+          const SizedBox(height: 12),
+          _SectionCard(
+            title: context.tr('tailored_resume'),
+            child: _buildTailoredResumeContent(context),
+          ),
         ],
       ),
     );
@@ -428,6 +468,45 @@ class _JobDetailsScreenState extends ConsumerState<JobDetailsScreen> {
     }
 
     return SelectableText(coverLetter);
+  }
+
+  Widget _buildTailoredResumeContent(BuildContext context) {
+    if (!_tailoredResumeRequested) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.tr('tailored_resume_description')),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _loadTailoredResume,
+            icon: const Icon(Icons.description_outlined),
+            label: Text(context.tr('generate_resume')),
+          ),
+        ],
+      );
+    }
+
+    if (_isLoadingTailoredResume) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_tailoredResumeError != null) {
+      return _InlineError(
+        message: _tailoredResumeError!,
+        actionLabel: context.tr('retry'),
+        onPressed: () {
+          _loadTailoredResume();
+        },
+      );
+    }
+
+    final resume = (_generatedTailoredResume ?? '').trim();
+
+    if (resume.isEmpty) {
+      return Text(context.tr('resume_generation_unavailable'));
+    }
+
+    return SelectableText(resume);
   }
 }
 

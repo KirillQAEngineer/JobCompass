@@ -282,6 +282,13 @@ const Map<AppLanguage, Map<String, String>> _translations = {
     'generate_cover_letter': 'Generate cover letter',
     'cover_letter_unavailable': 'The cover letter is not available right now.',
     'failed_generate_cover_letter': 'Could not generate cover letter',
+    'tailored_resume': 'Tailored Resume',
+    'tailored_resume_description':
+        'Generate a resume version focused on this vacancy requirements.',
+    'generate_resume': 'Generate tailored resume',
+    'failed_generate_resume': 'Could not generate tailored resume',
+    'resume_generation_unavailable':
+        'Tailored resume is not available right now.',
     'loading_match': 'Calculating match percentage...',
     'failed_load_match': 'Could not calculate match percentage',
     'required_skills_title': 'Required Skills',
@@ -508,6 +515,12 @@ const Map<AppLanguage, Map<String, String>> _translations = {
     'cover_letter_unavailable': 'Сопроводительное письмо сейчас недоступно.',
     'failed_generate_cover_letter':
         'Не удалось сгенерировать сопроводительное письмо',
+    'tailored_resume': 'Резюме под вакансию',
+    'tailored_resume_description':
+        'Сгенерируйте версию резюме, сфокусированную на требованиях этой вакансии.',
+    'generate_resume': 'Сгенерировать резюме',
+    'failed_generate_resume': 'Не удалось сгенерировать резюме под вакансию',
+    'resume_generation_unavailable': 'Резюме под вакансию сейчас недоступно.',
     'loading_match': 'Рассчитываем процент совпадения...',
     'failed_load_match': 'Не удалось рассчитать процент совпадения',
     'required_skills_title': 'Требуемые навыки',

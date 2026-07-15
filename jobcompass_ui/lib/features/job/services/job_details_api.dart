@@ -53,4 +53,10 @@ class JobDetailsApi {
 
     return response.data['cover_letter']?.toString() ?? '';
   }
+
+  Future<String> fetchTailoredResume(Job job) async {
+    final response = await dio.post('/jobs/resume', data: _payload(job));
+
+    return response.data['resume']?.toString() ?? '';
+  }
 }

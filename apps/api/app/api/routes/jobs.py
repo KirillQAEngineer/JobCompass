@@ -20,12 +20,14 @@ from app.schemas.job_description_response import JobDescriptionResponse
 from app.schemas.job_match import JobMatch
 from app.schemas.job_match_request import JobMatchRequest
 from app.schemas.job_requirements import JobRequirementsResponse
+from app.schemas.job_resume_response import JobResumeResponse
 from app.services.application.job_description_service import (
     JobDescriptionService,
 )
 from app.services.application.job_cover_letter_service import (
     JobCoverLetterService,
 )
+from app.services.application.job_resume_service import JobResumeService
 from app.services.application.job_requirements_service import (
     JobRequirementsService,
 )
@@ -144,6 +146,35 @@ def job_cover_letter(
 
     return JobCoverLetterResponse(
         cover_letter=cover_letter,
+    )
+
+
+@router.post(
+    "/resume",
+    response_model=JobResumeResponse,
+)
+def job_resume(
+    request: JobMatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = ResumeProfileRepository(db).get_by_user_id(
+        current_user.id,
+    )
+
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume profile not found",
+        )
+
+    resume = JobResumeService().generate(
+        profile,
+        request.job,
+    )
+
+    return JobResumeResponse(
+        resume=resume,
     )
 
 

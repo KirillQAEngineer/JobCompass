@@ -1,8 +1,8 @@
 from pathlib import Path
 from uuid import uuid4
+import logging
 
 from fastapi import HTTPException, UploadFile
-from google.genai import errors
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -11,6 +11,7 @@ from app.db.models.user import User
 from app.db.repositories.resume_profile_repository import (
     ResumeProfileRepository,
 )
+from app.schemas.analysis import AnalysisResponse
 from app.schemas.resume_profile import ResumeProfile as ResumeProfileSchema
 from app.schemas.upload import UploadResponse
 from app.services.ai.factory import get_ai
@@ -19,6 +20,7 @@ from app.services.parsers.parser import extract_text
 
 UPLOAD_DIR = Path(settings.upload_dir)
 UPLOAD_DIR.mkdir(exist_ok=True)
+logger = logging.getLogger(__name__)
 
 
 class ResumeService:
@@ -26,7 +28,7 @@ class ResumeService:
     def __init__(self, db: Session):
         self.db = db
         self.repository = ResumeProfileRepository(db)
-        self.ai = get_ai()
+        self.ai = None
 
     async def upload_resume(
         self,
@@ -38,11 +40,39 @@ class ResumeService:
 
         self._validate_file(filename)
 
-        file_path = await self._save_file(file)
+        try:
+            file_path = await self._save_file(file)
+        except OSError as exception:
+            logger.exception("Failed to save uploaded resume")
 
-        resume_text = self._extract_text(
-            file_path,
-        )
+            raise HTTPException(
+                status_code=500,
+                detail="Could not save uploaded resume file.",
+            ) from exception
+
+        try:
+            resume_text = self._extract_text(
+                file_path,
+            ).strip()
+        except Exception as exception:
+            logger.exception("Failed to extract text from resume")
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Could not read text from this resume. "
+                    "Please upload a text-based PDF or DOCX file."
+                ),
+            ) from exception
+
+        if not resume_text:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Could not find readable text in this resume. "
+                    "Please upload a text-based PDF or DOCX file."
+                ),
+            )
 
         try:
             profile = self._build_resume_profile(
@@ -52,14 +82,18 @@ class ResumeService:
             analysis = self._analyze_resume(
                 resume_text,
             )
-        except errors.APIError as exception:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "AI service is temporarily unavailable. "
-                    "Please try again later."
-                ),
-            ) from exception
+        except Exception:
+            logger.exception(
+                "AI resume analysis failed. Falling back to local profile."
+            )
+            profile = self._fallback_profile(resume_text)
+            analysis = self._fallback_analysis(resume_text)
+
+        if profile is None:
+            profile = self._fallback_profile(resume_text)
+
+        if analysis is None:
+            analysis = self._fallback_analysis(resume_text)
 
         self._save_resume_profile(
             user,
@@ -115,7 +149,7 @@ class ResumeService:
         resume_text: str,
     ):
 
-        return self.ai.build_resume_profile(
+        return self._get_ai().build_resume_profile(
             resume_text,
         )
 
@@ -124,9 +158,15 @@ class ResumeService:
         resume_text: str,
     ):
 
-        return self.ai.analyze_resume(
+        return self._get_ai().analyze_resume(
             resume_text,
         )
+
+    def _get_ai(self):
+        if self.ai is None:
+            self.ai = get_ai()
+
+        return self.ai
 
     def _save_resume_profile(
         self,
@@ -140,3 +180,90 @@ class ResumeService:
             profile=profile,
             resume_text=resume_text,
         )
+
+    def _fallback_profile(
+        self,
+        resume_text: str,
+    ) -> ResumeProfileSchema:
+        normalized = resume_text.lower()
+        skills = self._extract_keywords(
+            normalized,
+            [
+                "api",
+                "automation",
+                "docker",
+                "git",
+                "java",
+                "jira",
+                "manual testing",
+                "mobile",
+                "postman",
+                "python",
+                "qa",
+                "regression",
+                "selenium",
+                "sql",
+                "test cases",
+                "testing",
+                "web",
+            ],
+        )
+        technologies = self._extract_keywords(
+            normalized,
+            [
+                "android",
+                "appium",
+                "charles",
+                "docker",
+                "fastapi",
+                "flutter",
+                "git",
+                "ios",
+                "jenkins",
+                "linux",
+                "postgresql",
+                "postman",
+                "pytest",
+                "selenium",
+            ],
+        )
+
+        profession = "QA Engineer" if "qa" in normalized else "Specialist"
+        level = "Senior" if "senior" in normalized else "Middle"
+
+        return ResumeProfileSchema(
+            profession=profession,
+            level=level,
+            skills=skills or ["Testing"],
+            technologies=technologies,
+            english_level="Not specified",
+            preferred_roles=[profession],
+        )
+
+    def _fallback_analysis(
+        self,
+        resume_text: str,
+    ) -> AnalysisResponse:
+        return AnalysisResponse(
+            summary=(
+                "Resume was uploaded and parsed. AI analysis was not "
+                "available, so JobCompass created a basic local profile."
+            ),
+            score=60,
+            strengths=["Readable resume text was found."],
+            weaknesses=["AI-based detailed analysis is temporarily unavailable."],
+            recommendations=[
+                "Review and edit the generated profile fields manually.",
+            ],
+        )
+
+    def _extract_keywords(
+        self,
+        normalized_text: str,
+        keywords: list[str],
+    ) -> list[str]:
+        return [
+            keyword.upper() if keyword in {"api", "qa", "sql"} else keyword.title()
+            for keyword in keywords
+            if keyword in normalized_text
+        ][:10]
