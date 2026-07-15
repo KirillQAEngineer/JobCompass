@@ -7,6 +7,10 @@ from app.services.jobs.remotive import RemotiveProvider
 from app.services.jobs.jooble import JoobleProvider
 from app.services.jobs.themuse import TheMuseProvider
 from app.services.jobs.adzuna import AdzunaProvider
+from app.services.jobs.arbeitnow import ArbeitnowProvider
+from app.services.jobs.greenhouse import GreenhouseProvider
+from app.services.jobs.jobicy import JobicyProvider
+from app.services.jobs.lever import LeverProvider
 from app.services.jobs.rss import (
     JobspressoProvider,
     WeWorkRemotelyProvider,
@@ -30,8 +34,12 @@ class JobsAggregator:
             # GLOBAL
             RemoteOKProvider(),
             RemotiveProvider(),
+            JobicyProvider(),
+            ArbeitnowProvider(),
             WeWorkRemotelyProvider(),
             JobspressoProvider(),
+            GreenhouseProvider(),
+            LeverProvider(),
             JoobleProvider(),
             TheMuseProvider(),
             AdzunaProvider(),

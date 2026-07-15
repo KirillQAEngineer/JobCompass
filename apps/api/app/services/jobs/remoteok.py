@@ -2,6 +2,7 @@ import requests
 
 from app.schemas.job import Job
 from app.services.jobs.base import JobProvider
+from app.services.jobs.search_terms import matches_search_terms
 
 
 class RemoteOKProvider(JobProvider):
@@ -28,8 +29,25 @@ class RemoteOKProvider(JobProvider):
         for item in data[1:]:
             title = item.get("position", "")
 
-            if query.lower() not in title.lower():
+            searchable = " ".join(
+                [
+                    title,
+                    item.get("description") or "",
+                    item.get("company") or "",
+                    " ".join(item.get("tags") or []),
+                ]
+            )
+
+            if not matches_search_terms(
+                searchable,
+                query,
+            ):
                 continue
+
+            published_at = (
+                item.get("date")
+                or item.get("epoch")
+            )
 
             jobs.append(
                 Job(
@@ -42,8 +60,9 @@ class RemoteOKProvider(JobProvider):
                     description=item.get("description"),
                     work_format="Remote",
                     published_at=(
-                        item.get("date")
-                        or item.get("epoch")
+                        str(published_at)
+                        if published_at is not None
+                        else None
                     ),
                 )
             )
