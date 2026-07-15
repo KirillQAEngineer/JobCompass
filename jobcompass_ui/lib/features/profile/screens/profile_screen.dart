@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../../../core/localization/app_localizations.dart';
 import '../../../providers/profile_provider.dart';
@@ -116,7 +117,9 @@ class ProfileScreen extends ConsumerWidget {
 
                 if (state.hasError) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(context.tr('failed_upload'))),
+                    SnackBar(
+                      content: Text(_uploadErrorMessage(context, state.error)),
+                    ),
                   );
                 }
               },
@@ -259,7 +262,10 @@ class ProfileScreen extends ConsumerWidget {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              context.tr('failed_upload'),
+                                              _uploadErrorMessage(
+                                                context,
+                                                state.error,
+                                              ),
                                             ),
                                           ),
                                         );
@@ -410,6 +416,27 @@ class ProfileScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  String _uploadErrorMessage(BuildContext context, Object? error) {
+    if (error is DioException && error.response?.data is Map) {
+      final data = Map<String, dynamic>.from(error.response?.data as Map);
+      final detail = data['detail'];
+
+      if (detail != null) {
+        return detail.toString();
+      }
+    }
+
+    if (error is DioException && error.response?.data is String) {
+      final detail = (error.response?.data as String).trim();
+
+      if (detail.isNotEmpty) {
+        return detail;
+      }
+    }
+
+    return context.tr('failed_upload');
   }
 }
 
