@@ -2,6 +2,7 @@ import requests
 
 from app.schemas.job import Job
 from app.services.jobs.base import JobProvider
+from app.services.jobs.search_terms import matches_search_terms
 
 
 class TheMuseProvider(JobProvider):
@@ -28,7 +29,17 @@ class TheMuseProvider(JobProvider):
         for item in data.get("results", []):
             title = item.get("name", "")
 
-            if query.lower() not in title.lower():
+            searchable = " ".join(
+                [
+                    title,
+                    item.get("contents") or "",
+                ]
+            )
+
+            if not matches_search_terms(
+                searchable,
+                query,
+            ):
                 continue
 
             company = ""
