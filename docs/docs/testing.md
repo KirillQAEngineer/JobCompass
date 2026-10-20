@@ -5,37 +5,96 @@ title: Testing
 
 # Testing
 
-Тестирование JobCompass делится на автоматические тесты, smoke-тесты, regression-тесты и негативные кейсы.
+Все автоматические тесты JobCompass находятся в Maven-модуле `qa-tests` и
+пишутся на Java 21. API проверяется через REST Assured, браузерный UI — через
+Selenium WebDriver 4. JUnit 5 запускает тесты, AssertJ выполняет проверки, а
+Allure формирует отчёты и хранит вложения при падениях.
 
 Автоматический запуск на Pull Request, структура GitHub Actions jobs и учебный сценарий описаны на странице [CI/CD и практика автотестов](./ci-cd.md).
 
-## Автоматические тесты backend
+## Структура тестового проекта
 
-Запуск всех backend-тестов:
-
-```bash
-docker compose exec -e PYTHONPATH=/app api pytest
+```text
+qa-tests/
+├── pom.xml
+└── src/test/
+    ├── java/com/jobcompass/qa/
+    │   ├── api/       # REST Assured
+    │   ├── config/    # параметры окружения
+    │   ├── support/   # тестовые пользователи и подготовка БД
+    │   └── ui/        # Selenium, Page Object, Allure attachments
+    └── resources/
 ```
 
-Запуск отдельного файла:
+Python/FastAPI и Dart/Flutter остаются технологиями самого приложения. Тестовый
+фреймворк независим от них и использует Java 21.
+
+## Требования
+
+- JDK 21;
+- Maven 3.9+;
+- Google Chrome;
+- запущенные PostgreSQL и FastAPI;
+- для UI-тестов — собранный Flutter Web.
+
+## Автоматические API-тесты
+
+Запуск полного API-набора:
 
 ```bash
-docker compose exec -e PYTHONPATH=/app api pytest tests/services/jobs/test_quality_pipeline.py
+mvn -f qa-tests/pom.xml -Papi-tests test
 ```
 
-## Автоматические тесты frontend
+Запуск класса или метода:
+
+```bash
+mvn -f qa-tests/pom.xml -Papi-tests -Dtest=AuthSecurityApiTest test
+mvn -f qa-tests/pom.xml -Papi-tests \
+  -Dtest=AuthSecurityApiTest#registrationEnforcesPasswordBoundary test
+```
+
+По умолчанию тесты ожидают API на `http://127.0.0.1:8000` и отдельную БД
+`jobcompass_ci`. Production Supabase в тестах не используется.
+
+## Автоматические UI-тесты
+
+Соберите Flutter Web со включённым semantic DOM только для E2E-окружения и
+запустите локальный статический сервер:
 
 ```bash
 cd jobcompass_ui
-flutter test
+flutter build web --release --base-href / \
+  --dart-define=E2E_SEMANTICS_ENABLED=true \
+  --dart-define=API_BASE_URL=http://127.0.0.1:8000
+python3 -m http.server 3000 --bind 127.0.0.1 --directory build/web
 ```
 
-Статический анализ:
+Флаг `E2E_SEMANTICS_ENABLED` не используется в production-сборке. Он создаёт
+доступный semantic DOM, с которым Selenium работает как пользователь и
+скринридер. После запуска API и Flutter Web на `http://127.0.0.1:3000`:
 
 ```bash
-cd jobcompass_ui
-flutter analyze
+WEB_BASE_URL=http://127.0.0.1:3000 \
+API_BASE_URL=http://127.0.0.1:8000 \
+JDBC_DATABASE_URL=jdbc:postgresql://127.0.0.1:5432/jobcompass_ci \
+DATABASE_USER=jobcompass \
+DATABASE_PASSWORD=jobcompass \
+HEADLESS=true \
+mvn -f qa-tests/pom.xml -Pui-tests test
 ```
+
+Для наблюдения за браузером используйте `HEADLESS=false`. Selenium Manager
+автоматически подбирает драйвер установленного Chrome.
+
+## Allure
+
+Результаты создаются в `qa-tests/target/allure-results`. Локальный отчёт:
+
+```bash
+mvn -f qa-tests/pom.xml allure:serve
+```
+
+При падении UI-теста автоматически прикладываются screenshot и HTML страницы.
 
 ## Smoke tests
 
@@ -67,10 +126,10 @@ docker compose exec api alembic current
 
 Ожидаемо: база на актуальной миграции.
 
-4. Запустить короткий набор backend-тестов:
+4. Запустить Java API-набор:
 
 ```bash
-docker compose exec -e PYTHONPATH=/app api pytest tests/schemas tests/services/jobs
+mvn -f qa-tests/pom.xml -Papi-tests test
 ```
 
 ### Frontend smoke
@@ -104,6 +163,10 @@ flutter run -d chrome --web-port 5124
 12. Изменить статус отклика.
 13. Архивировать вакансию.
 14. Открыть архив и восстановить вакансию.
+
+Selenium автоматически проверяет вход, переходы в Аналитику и Профиль, logout,
+мобильный ввод и отсутствие горизонтального overflow. Остальные product smoke
+сценарии выполняются вручную после production-публикации.
 
 ## Regression tests
 
@@ -195,3 +258,13 @@ Regression tests - проверки, которые подтверждают, ч
 - Миграция не применена: backend должен явно падать в логах, а не молча отдавать неправильные данные.
 - Уникальный индекс не позволяет создать дубль job interaction.
 - Удаление резюме не оставляет профиль в неконсистентном состоянии.
+
+## Правила новых автотестов
+
+1. Один тест проверяет один законченный бизнес-сценарий.
+2. Тест создаёт собственные данные и не зависит от порядка запуска.
+3. Production URL, реальные персональные данные и секреты запрещены.
+4. API-подготовка допустима для UI-теста, если проверяется пользовательский результат.
+5. UI-локаторы находятся в Page Object; проверки остаются в тесте.
+6. Используются явные ожидания Selenium, а не `Thread.sleep`.
+7. Проверки пишутся через AssertJ, шаги и вложения — через Allure.

@@ -50,6 +50,20 @@ flutter run -d chrome --web-port 5124 \
   --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
+## Java-автотесты
+
+Используются JDK 21 и Maven 3.9+:
+
+```bash
+java -version
+mvn -version
+mvn -f qa-tests/pom.xml -Papi-tests test
+mvn -f qa-tests/pom.xml -Pui-tests test
+```
+
+UI-набор ожидает Flutter Web на `http://127.0.0.1:3000`. Подробная подготовка
+окружения описана на странице [Testing](./testing.md).
+
 ## Остановка окружения
 
 ```bash

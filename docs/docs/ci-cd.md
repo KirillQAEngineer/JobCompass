@@ -14,7 +14,7 @@ Workflow находится в `.github/workflows/ci-cd.yml`.
 1. Разработчик создаёт отдельную ветку от `develop`.
 2. Добавляет код и автотесты, делает commit и push.
 3. Создаёт Pull Request в `develop`.
-4. GitHub автоматически запускает backend, frontend и documentation jobs.
+4. GitHub запускает Java API, frontend build, Java UI и documentation jobs.
 5. После их успешного завершения собирается Docker-образ backend.
 6. Общий check `CI Passed` становится зелёным только после прохождения всех обязательных этапов.
 7. Изменения объединяются с `develop`.
@@ -26,9 +26,10 @@ Workflow находится в `.github/workflows/ci-cd.yml`.
 
 | Job | Что проверяется | Результат |
 | --- | --- | --- |
-| Backend | Python dependencies, компиляция, Alembic, PostgreSQL, Pytest, API smoke | JUnit XML и API log |
-| Frontend | Dart format, Flutter Analyze, Flutter tests, Web build | LCOV coverage и собранный сайт |
-| Documentation | Чистая установка npm, audit critical, Docusaurus build | Собранная документация |
+| Java API | PostgreSQL 17, Alembic, FastAPI, REST Assured | Surefire, Allure и API log |
+| Frontend | Dart format, Flutter Analyze, Web build | Собранный сайт |
+| Java UI | PostgreSQL 17, FastAPI, Flutter Web, Selenium | Surefire, Allure, screenshots и logs |
+| Documentation | Чистая установка npm, audit moderate, Docusaurus build | Собранная документация |
 | Package | Сборка backend Docker image | Проверенный Docker-образ внутри runner |
 | CI Passed | Результаты всех обязательных jobs | Общий зелёный или красный check |
 | CD | Сборка Pages artifact и deploy | Выполняется только для успешного `main` |
@@ -62,73 +63,51 @@ git push -u origin test/my-first-autotest
 
 На GitHub создайте Pull Request: `test/my-first-autotest` → `develop`. Во вкладке **Checks** появятся отдельные jobs. Нажатие на job открывает последовательность шагов и полный log.
 
-## Где писать backend-автотесты
+## Где писать Java-автотесты
 
-Backend-тесты находятся в `apps/api/tests`:
+Единый Maven-модуль находится в `qa-tests`:
 
-- `api` — проверки HTTP endpoints, авторизации и кодов ответа;
-- `db/repositories` — работа с базой и ограничениями;
-- `schemas` — валидация Pydantic-схем;
-- `services` — бизнес-логика, парсеры и внешние providers.
+- `api` — REST Assured проверки HTTP-контрактов и бизнес-процессов;
+- `ui` — Selenium пользовательские сценарии;
+- `ui/pages` — Page Object;
+- `support` — подготовка тестовых пользователей в изолированной CI-базе;
+- `config` — параметры окружения.
 
-Минимальный тест:
+Минимальный API-тест:
 
-```python
-def test_total_is_sum_of_items():
-    items = [2, 3, 5]
+```java
+@Test
+@Tag("api")
+void healthEndpointIsAvailable() {
+    int status = RestAssured.given()
+            .baseUri(TestConfig.apiBaseUrl())
+            .get("/")
+            .statusCode();
 
-    assert sum(items) == 10
-```
-
-Запустить один файл:
-
-```bash
-PYTHONPATH=apps/api apps/api/.venv/bin/python -m pytest \
-  apps/api/tests/path/to/test_file.py -v
-```
-
-Запустить один тест:
-
-```bash
-PYTHONPATH=apps/api apps/api/.venv/bin/python -m pytest \
-  apps/api/tests/path/to/test_file.py::test_name -v
-```
-
-Для API-тестов используйте `TestClient`, отдельную тестовую БД или dependency override. Тест не должен обращаться к production Supabase и не должен зависеть от реального внешнего job provider.
-
-## Где писать Flutter-автотесты
-
-Flutter-тесты находятся в `jobcompass_ui/test`:
-
-- `features` — widget- и service-тесты отдельных функций;
-- `providers` — Riverpod state и API-сценарии;
-- `widget_test.dart` — базовая проверка приложения.
-
-Минимальный unit-тест:
-
-```dart
-import 'package:flutter_test/flutter_test.dart';
-
-void main() {
-  test('normalizes an email', () {
-    final result = ' User@Example.com '.trim().toLowerCase();
-
-    expect(result, 'user@example.com');
-  });
+    assertThat(status).isEqualTo(200);
 }
 ```
 
-Запустить один файл:
+Запустить API-класс:
 
 ```bash
-cd jobcompass_ui
-flutter test test/path/to/file_test.dart
+mvn -f qa-tests/pom.xml -Papi-tests -Dtest=AuthSecurityApiTest test
 ```
+
+Запустить UI-класс:
+
+```bash
+mvn -f qa-tests/pom.xml -Pui-tests -Dtest=AuthUiTest test
+```
+
+Тест не должен обращаться к production Supabase или зависеть от реального
+внешнего job provider. UI-локаторы выносятся в Page Object, а API-подготовка
+данных выполняется только через support-классы.
 
 ## Как потренировать падение pipeline
 
 1. Создайте учебную ветку.
-2. Добавьте тест с заведомо неправильным ожиданием, например `assert 2 + 2 == 5`.
+2. Добавьте Java-тест с заведомо неправильным AssertJ-ожиданием.
 3. Сделайте push и откройте PR в `develop`.
 4. Откройте красный backend job и найдите в log имя упавшего теста, expected и actual result.
 5. Исправьте ожидание на правильное.
@@ -141,8 +120,8 @@ flutter test test/path/to/file_test.dart
 
 Внизу страницы завершённого workflow можно скачать:
 
-- `backend-test-reports-*` — JUnit-отчёт и log тестового API;
-- `flutter-coverage-*` — Flutter coverage в формате LCOV;
+- `java-api-test-reports-*` — Surefire, Allure и log тестового API;
+- `java-ui-test-reports-*` — Surefire, Allure, screenshots и server logs;
 - `web-app-*` — production build Flutter Web;
 - `documentation-*` — production build Docusaurus.
 
@@ -154,7 +133,8 @@ flutter test test/path/to/file_test.dart
 
 ```bash
 make lint
-make test
+make api-test
+make ui-test
 make docs-build
 make web-build
 make docker-build
@@ -166,11 +146,8 @@ make docker-build
 make ci
 ```
 
-По умолчанию Makefile использует `apps/api/.venv/bin/python`. Другой Python можно передать явно:
-
-```bash
-make backend-test PYTHON=python3
-```
+Для Java-тестов требуются JDK 21 и Maven 3.9+. Полная подготовка локальных
+API, PostgreSQL и Flutter Web описана на странице [Testing](./testing.md).
 
 ## Branch protection
 
@@ -187,8 +164,9 @@ make backend-test PYTHON=python3
 
 ## Что делать при ошибке
 
-- `Backend` — найти первый traceback или failed test; проверить миграции и HTTP status.
-- `Frontend` — проверить format, analyzer, затем конкретный Flutter test.
+- `Java API` — найти первый REST Assured test; проверить API log и миграции.
+- `Java UI` — открыть screenshot, page source, UI/API logs и первый failed test.
+- `Frontend` — проверить format, analyzer и Web build.
 - `Documentation` — проверить npm install, broken link или ошибку MDX.
 - `Package` — проверить Dockerfile и наличие файлов в build context.
 - `CI Passed` — посмотреть, какой предыдущий job имеет `failure`, `cancelled` или `skipped`.

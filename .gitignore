@@ -12,6 +12,7 @@ node_modules/
 
 # Generated build output
 build/
+target/
 .dart_tool/
 .docusaurus/
 

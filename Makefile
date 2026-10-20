@@ -1,6 +1,7 @@
 PYTHON ?= apps/api/.venv/bin/python
+MAVEN ?= mvn
 
-.PHONY: up down logs api test backend-test frontend-test lint backend-lint frontend-lint docs-build web-build docker-build ci
+.PHONY: up down logs api test api-test ui-test lint backend-lint frontend-lint docs-build web-build docker-build ci
 
 up:
 	docker compose up -d
@@ -14,19 +15,19 @@ logs:
 api:
 	docker compose up -d postgres api
 
-backend-test:
-	PYTHONPATH=apps/api $(PYTHON) -m pytest apps/api/tests
+api-test:
+	$(MAVEN) -f qa-tests/pom.xml -Papi-tests test
 
-frontend-test:
-	cd jobcompass_ui && flutter test --coverage
+ui-test:
+	$(MAVEN) -f qa-tests/pom.xml -Pui-tests test
 
-test: backend-test frontend-test
+test: api-test ui-test
 
 backend-lint:
 	PYTHONPATH=apps/api $(PYTHON) -m compileall -q apps/api/app apps/api/alembic/versions
 
 frontend-lint:
-	cd jobcompass_ui && dart format --output=none --set-exit-if-changed lib test
+	cd jobcompass_ui && dart format --output=none --set-exit-if-changed lib
 	cd jobcompass_ui && flutter analyze --fatal-infos --fatal-warnings
 
 lint: backend-lint frontend-lint

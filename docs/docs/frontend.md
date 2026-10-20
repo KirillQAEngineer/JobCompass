@@ -20,7 +20,7 @@ jobcompass_ui
 - `lib/models` - модели данных.
 - `lib/core/network` - API client.
 - `lib/core/localization` - локализация.
-- `test` - frontend-тесты.
+- UI проверяется внешним Java-модулем `qa-tests` через Selenium WebDriver.
 
 ## Локальный запуск
 
@@ -60,6 +60,28 @@ flutter build web \
 ```
 
 В проекте это автоматизировано через GitHub Actions workflow.
+
+## Автоматические UI-тесты
+
+Selenium-тесты и Page Object находятся в:
+
+```text
+qa-tests/src/test/java/com/jobcompass/qa/ui
+```
+
+После запуска backend, тестовой БД и Flutter Web:
+
+```bash
+mvn -f qa-tests/pom.xml -Pui-tests test
+```
+
+Статическая проверка самого Flutter-кода остаётся частью frontend build:
+
+```bash
+cd jobcompass_ui
+dart format --output=none --set-exit-if-changed lib
+flutter analyze --fatal-infos --fatal-warnings
+```
 
 ## Локализация
 

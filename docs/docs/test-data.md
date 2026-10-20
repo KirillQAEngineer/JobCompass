@@ -12,11 +12,26 @@ title: Test Data
 Рекомендуемый локальный пользователь:
 
 ```text
-email: qa@example.com
-password: password123
+email: java.qa@example.com
+password: Password-123
 ```
 
-Если регистрация или seed-скрипт ещё не автоматизированы, пользователя можно создать через UI или backend endpoint авторизации.
+Java-тесты создают уникальные email на каждый запуск. Для сценариев, не
+связанных с email-доставкой, подтверждённый пользователь создаётся в
+изолированной CI-базе, после чего вход выполняется через настоящий `/auth/login`.
+
+Production Supabase для тестовых данных не используется.
+
+## Переменные тестового окружения
+
+```text
+API_BASE_URL=http://127.0.0.1:8000
+WEB_BASE_URL=http://127.0.0.1:3000
+JDBC_DATABASE_URL=jdbc:postgresql://127.0.0.1:5432/jobcompass_ci
+DATABASE_USER=jobcompass
+DATABASE_PASSWORD=jobcompass
+HEADLESS=true
+```
 
 ## Тестовое резюме
 
