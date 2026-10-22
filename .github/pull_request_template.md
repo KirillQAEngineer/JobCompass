@@ -4,8 +4,9 @@
 
 ## Какие автотесты добавлены или изменены
 
-- [ ] Backend: `apps/api/tests`
-- [ ] Flutter: `jobcompass_ui/test`
+- [ ] API: `mvn -f qa-tests/pom.xml -Papi-tests test`
+- [ ] UI: `mvn -f qa-tests/pom.xml -Pui-tests test`
+- [ ] Allure results reviewed for failed tests
 - [ ] Тесты не нужны — причина описана ниже
 
 ## Локальная проверка

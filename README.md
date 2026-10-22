@@ -28,7 +28,9 @@ JobCompass помогает специалистам:
 
 Основные инструкции находятся в `docs/docs/deployment.md`.
 
-Учебный CI/CD-контур и практика написания автотестов описаны в `docs/docs/ci-cd.md`.
+Автотесты реализованы единым Java 21/Maven модулем: Selenium WebDriver для UI,
+REST Assured для API, JUnit 5, AssertJ и Allure. Учебный CI/CD-контур описан в
+`docs/docs/ci-cd.md`.
 
 
 
@@ -41,5 +43,7 @@ make down       # Остановить проект
 make logs       # Посмотреть логи
 make api        # Запустить только API
 make web        # Запустить только Frontend
-make test       # Запустить тесты
+make api-test    # Запустить Java REST Assured тесты
+make ui-test     # Запустить Java Selenium тесты
+make test        # Запустить оба Java-набора
 make lint       # Проверка кода

@@ -21,7 +21,7 @@ apps/api
 - `app/schemas` - Pydantic схемы.
 - `app/services` - бизнес-логика.
 - `alembic/versions` - миграции базы данных.
-- `tests` - backend-тесты.
+- backend проверяется внешним Java-модулем `qa-tests` через REST Assured.
 
 ## Локальный запуск
 
@@ -39,16 +39,16 @@ curl http://localhost:8000/health
 
 ## Основные команды
 
-Запустить тесты backend:
+Запустить Java API-тесты (при запущенных PostgreSQL и FastAPI):
 
 ```bash
-docker compose exec -e PYTHONPATH=/app api pytest
+mvn -f qa-tests/pom.xml -Papi-tests test
 ```
 
-Запустить отдельный тестовый файл:
+Запустить отдельный класс:
 
 ```bash
-docker compose exec -e PYTHONPATH=/app api pytest tests/services/jobs/test_rss_provider.py
+mvn -f qa-tests/pom.xml -Papi-tests -Dtest=JobsApiTest test
 ```
 
 Применить миграции:
@@ -164,4 +164,7 @@ Adzuna и Jooble читаются постранично, запросы к не
 2. Добавить Pydantic schema в `app/schemas`, если нужны request/response модели.
 3. Вынести работу с БД в repository.
 4. Добавить бизнес-логику в service.
-5. Покрыть тестами happy path и ошибки.
+5. Покрыть публичный контракт happy path и негативными REST Assured тестами в `qa-tests`.
+
+Внутренний код backend остаётся на Python/FastAPI. Java используется как
+независимый тестовый клиент и проверяет API так же, как внешний потребитель.

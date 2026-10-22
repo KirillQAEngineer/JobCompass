@@ -38,10 +38,12 @@ Workflow находится здесь:
 Он выполняет:
 
 1. Проверку backend, миграций и API на временной PostgreSQL.
-2. Flutter format, analyze, autotests и production Web build.
-3. Проверку и сборку Docusaurus.
-4. Сборку Docker image backend.
-5. Публикацию проверенных Flutter и Docusaurus artifacts через GitHub Pages только для `main`.
+2. Java REST Assured тесты API против временного PostgreSQL 17.
+3. Flutter format, analyze и production Web build.
+4. Java Selenium тесты против собранного Flutter Web и локального FastAPI.
+5. Проверку и сборку Docusaurus.
+6. Сборку Docker image backend.
+7. Публикацию проверенных Flutter и Docusaurus artifacts через GitHub Pages только для `main`.
 
 ## Настройка GitHub Pages
 
